@@ -1,0 +1,1933 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BVA Tool — 경계값 분석기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --surface: #ffffff;
+    --surface-2: #f5f5f7;
+    --surface-3: #ebebed;
+    --border: #e0e0e5;
+    --border-bright: #c8c8d0;
+    --accent: #0071e3;
+    --accent-dim: #e1edfb;
+    --accent-glow: rgba(0,113,227,0.10);
+    --green: #1a8a4a;
+    --green-dim: #e6f7ee;
+    --yellow: #996600;
+    --yellow-dim: #fff8e1;
+    --red: #d93025;
+    --red-dim: #fdecea;
+    --text: #1d1d1f;
+    --text-2: #515154;
+    --text-3: #98989d;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Pretendard', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* Header */
+  .header {
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-badge {
+    background: var(--accent);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .header-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .header-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    margin-left: auto;
+  }
+
+  /* Main */
+  .main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+  }
+
+  /* Panel */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .panel-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--text-3);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+  }
+  .panel-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Controls Row */
+  .controls-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+
+  /* Dropdown */
+  .dropdown-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 220px;
+  }
+  .dropdown-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-3);
+    margin-bottom: 7px;
+    letter-spacing: 0.03em;
+  }
+  .dropdown-btn {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+  }
+  .dropdown-btn:hover { border-color: var(--border-bright); }
+  .dropdown-btn.open {
+    border-color: var(--accent);
+    background: var(--surface-3);
+  }
+  .dropdown-selected-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+  }
+  .tag {
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .tag.none {
+    background: none;
+    color: var(--text-3);
+    font-family: var(--sans);
+    font-size: 13px;
+    padding: 0;
+  }
+  .dropdown-arrow {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: var(--text-3);
+    transition: transform 0.2s;
+  }
+  .dropdown-btn.open .dropdown-arrow { transform: rotate(180deg); }
+
+  .dropdown-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--border-bright);
+    border-radius: 10px;
+    padding: 8px;
+    z-index: 200;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    display: none;
+    animation: dropIn 0.15s ease;
+  }
+  .dropdown-menu.open { display: block; }
+  @keyframes dropIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.1s;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .menu-item:hover { background: var(--surface-3); }
+
+  .menu-item input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid var(--border-bright);
+    border-radius: 4px;
+    background: var(--surface);
+    cursor: pointer;
+    flex-shrink: 0;
+    position: relative;
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .menu-item input[type="checkbox"]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .menu-item input[type="checkbox"]:checked::after {
+    content: '';
+    position: absolute;
+    left: 3px; top: 1px;
+    width: 5px; height: 9px;
+    border: 2px solid #fff;
+    border-top: none; border-left: none;
+    transform: rotate(45deg);
+  }
+  .menu-char-preview {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-3);
+    margin-left: auto;
+  }
+
+  .menu-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 6px 4px;
+  }
+  .menu-actions {
+    display: flex;
+    gap: 6px;
+    padding: 6px 4px 2px;
+  }
+  .menu-action-btn {
+    flex: 1;
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px;
+    font-size: 11px;
+    font-family: var(--sans);
+    color: var(--text-2);
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+    text-align: center;
+  }
+  .menu-action-btn:hover {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent-dim);
+  }
+
+  /* Number Input */
+  .num-input-wrap {
+    display: flex;
+    flex-direction: column;
+    min-width: 160px;
+  }
+  .num-input-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-3);
+    margin-bottom: 7px;
+    letter-spacing: 0.03em;
+  }
+  .num-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .num-input-row:focus-within { border-color: var(--accent); }
+  .num-spin {
+    background: none;
+    border: none;
+    color: var(--text-3);
+    width: 34px;
+    height: 42px;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s, color 0.1s;
+    flex-shrink: 0;
+  }
+  .num-spin:hover { background: var(--surface-3); color: var(--text); }
+  .num-field {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    text-align: center;
+    padding: 0;
+    width: 0;
+    min-width: 0;
+  }
+  .num-field::placeholder { color: var(--text-3); }
+
+  /* Mode Toggle */
+  .mode-wrap {
+    display: flex;
+    flex-direction: column;
+    min-width: 160px;
+  }
+  .mode-wrap .num-input-label { margin-bottom: 7px; }
+  .toggle-group {
+    display: flex;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 3px;
+    height: 42px;
+  }
+  .toggle-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    border-radius: 6px;
+    color: var(--text-3);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+    padding: 0 8px;
+  }
+  .toggle-btn.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* Generate Button */
+  .gen-btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0 24px;
+    height: 42px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    white-space: nowrap;
+    flex-shrink: 0;
+    letter-spacing: 0.01em;
+    align-self: flex-end;
+  }
+  .gen-btn:hover { background: #0077ed; }
+  .gen-btn:active { transform: scale(0.97); }
+
+  /* Output Area */
+  .output-area { margin-top: 20px; }
+  .output-cards {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .card:hover {
+    border-color: var(--border-bright);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.09);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+  .card-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 3px 9px;
+    border-radius: 5px;
+  }
+  .badge-under  { background: var(--yellow-dim); color: var(--yellow); }
+  .badge-exact  { background: var(--green-dim);  color: var(--green);  }
+  .badge-over   { background: var(--red-dim);    color: var(--red);    }
+  .badge-single { background: var(--accent-dim); color: var(--accent); }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+  }
+  .card-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  .card-count span {
+    font-weight: 700;
+    color: var(--text-2);
+  }
+  .byte-count {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    background: var(--surface-3);
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+
+  .card-body {
+    padding: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .card-text {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--text);
+    word-break: break-all;
+    white-space: pre-wrap;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    min-height: 52px;
+    max-height: 160px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-bright) transparent;
+  }
+
+  .copy-btn {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-3);
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    white-space: nowrap;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    min-width: 60px;
+  }
+  .copy-btn svg { width: 16px; height: 16px; }
+  .copy-btn:hover {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent-dim);
+  }
+  .copy-btn.copied {
+    background: var(--green-dim);
+    color: var(--green);
+    border-color: var(--green-dim);
+  }
+
+  /* Empty State */
+  .empty-state {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--text-3);
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 2;
+  }
+  .empty-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+
+  /* Error state */
+  .error-msg {
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: var(--red);
+    font-size: 13px;
+    margin-top: 16px;
+    display: none;
+  }
+
+  /* Footer */
+  .footer-bar {
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    padding: 10px 32px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+  }
+  .footer-stat { display: flex; align-items: center; gap: 6px; }
+  .footer-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-3);
+  }
+  .footer-dot.on { background: #1a8a4a; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+
+  @media (max-width: 600px) {
+    .main { padding: 20px 12px 80px; }
+    .controls-row { gap: 12px; }
+    .header { padding: 12px 16px; }
+    .footer-bar { padding: 8px 16px; }
+  }
+
+  /* ── Help Button ── */
+  .help-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-bright);
+    background: var(--surface-2);
+    color: var(--text-3);
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .help-btn:hover, .help-btn.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  /* ── Help Drawer ── */
+  .help-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    background: rgba(0,0,0,0.18);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    animation: fadeIn 0.18s ease;
+  }
+  .help-overlay.open { display: block; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .help-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 360px;
+    max-width: 92vw;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    box-shadow: 4px 0 32px rgba(0,0,0,0.12);
+    z-index: 301;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+    overflow: hidden;
+  }
+  .help-overlay.open .help-drawer {
+    transform: translateX(0);
+  }
+
+  .help-drawer-header {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .help-drawer-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    flex: 1;
+  }
+  .help-drawer-close {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: var(--surface-3);
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s, color 0.1s;
+  }
+  .help-drawer-close:hover { background: var(--border-bright); color: var(--text); }
+
+  .help-drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-bright) transparent;
+  }
+
+  /* Help sections */
+  .help-section {
+    margin-bottom: 24px;
+  }
+  .help-section:last-child { margin-bottom: 0; }
+
+  .help-section-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .help-section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--accent-dim);
+  }
+
+  .help-text {
+    font-size: 12.5px;
+    color: var(--text-2);
+    line-height: 1.75;
+    margin-bottom: 10px;
+  }
+
+  .help-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+  .help-table th {
+    background: var(--surface-2);
+    color: var(--text-3);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 7px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .help-table td {
+    padding: 8px 10px;
+    color: var(--text-2);
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.6;
+  }
+  .help-table tr:last-child td { border-bottom: none; }
+  .help-table tr:hover td { background: var(--surface-2); }
+
+  .help-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 2px 7px;
+    border-radius: 4px;
+    vertical-align: middle;
+  }
+  .help-badge.ok { background: var(--green-dim); color: var(--green); }
+  .help-badge.fail { background: var(--red-dim); color: var(--red); }
+  .help-badge.under { background: var(--yellow-dim); color: var(--yellow); }
+  .help-badge.exact { background: var(--green-dim); color: var(--green); }
+  .help-badge.over { background: var(--red-dim); color: var(--red); }
+
+  .help-tip {
+    background: var(--accent-dim);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--text-2);
+    line-height: 1.65;
+    margin-bottom: 8px;
+  }
+  .help-tip strong { color: var(--accent); }
+
+  .help-shortcut-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-2);
+  }
+  .help-shortcut-row:last-child { border-bottom: none; }
+  .help-key {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-bright);
+    border-radius: 5px;
+    padding: 2px 8px;
+    color: var(--text);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Collapsible Panel */
+  .panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    padding-bottom: 16px;
+  }
+  .panel-header.collapsed {
+    padding-bottom: 0;
+  }
+  .panel-body {
+    overflow: visible;
+    transition: max-height 0.28s ease, opacity 0.22s ease;
+    max-height: 2000px;
+    opacity: 1;
+  }
+  .panel-body.collapsed {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+  }
+
+  /* Result Group (collapsible) */
+  .result-group {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+  .result-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    cursor: pointer;
+    user-select: none;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .result-group-header:hover { background: var(--surface-3); }
+  .result-group-header.collapsed { border-bottom: none; }
+  .result-group-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-2);
+    letter-spacing: -0.01em;
+  }
+  .result-group-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 2px 9px;
+    border-radius: 5px;
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+  .result-group-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    margin-left: auto;
+    margin-right: 4px;
+  }
+  .result-group-arrow {
+    width: 14px;
+    height: 14px;
+    color: var(--text-3);
+    transition: transform 0.22s ease;
+    flex-shrink: 0;
+  }
+  .result-group-arrow.collapsed { transform: rotate(-90deg); }
+  .result-group-body {
+    overflow: hidden;
+    transition: max-height 0.28s ease, opacity 0.22s ease;
+    max-height: 4000px;
+    opacity: 1;
+  }
+  .result-group-body.collapsed {
+    max-height: 0;
+    opacity: 0;
+  }
+  .result-group-inner {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .result-group-inner .card { margin-bottom: 0; }
+
+  /* Password Section */
+  .pw-section-box {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .pw-gen-btn {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-2);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0 20px;
+    height: 42px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+    white-space: nowrap;
+    flex-shrink: 0;
+    letter-spacing: 0.01em;
+    align-self: flex-end;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .pw-gen-btn:hover { background: var(--accent-dim); color: var(--accent); border-color: var(--accent-dim); }
+  .pw-gen-btn:active { transform: scale(0.97); }
+  .pw-gen-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+  .pw-cards {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr;
+  }
+  .pw-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .pw-card:hover { border-color: var(--border-bright); box-shadow: 0 4px 16px rgba(0,0,0,0.09); }
+
+  .pw-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+  .pw-badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .pw-badge-ok     { background: var(--green-dim); color: var(--green); }
+  .pw-badge-fail   { background: var(--red-dim);   color: var(--red);   }
+  .pw-card-title   { font-size: 12px; color: var(--text-2); font-weight: 500; }
+  .pw-card-reason  { font-family: var(--mono); font-size: 10px; color: var(--text-3); margin-left: auto; }
+
+  .pw-card-body {
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .pw-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+  .pw-value {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    word-break: break-all;
+    letter-spacing: 0.05em;
+  }
+  .pw-card-body .copy-btn { align-self: stretch; min-width: 54px; }
+</style>
+</head>
+<body>
+
+<!-- Help Overlay & Drawer -->
+<div class="help-overlay" id="helpOverlay" onclick="closeHelp(event)">
+  <div class="help-drawer" id="helpDrawer">
+    <div class="help-drawer-header">
+      <span class="help-drawer-title">📖 사용 설명서</span>
+      <button class="help-drawer-close" onclick="toggleHelp()">
+        <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+          <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="help-drawer-body">
+
+      <div class="help-section">
+        <div class="help-section-title">시작하기</div>
+        <div class="help-text">이 도구는 <strong>경계값 분석(BVA)</strong> 기법을 이용한 테스트 문자열 및 비밀번호 테스트 케이스를 자동으로 생성합니다. 별도 설치 없이 브라우저에서 바로 사용할 수 있습니다.</div>
+        <div class="help-tip"><strong>경계값 분석(BVA)란?</strong><br>입력값의 경계 근처에서 버그가 많이 발생한다는 원리를 이용해, N−1 / N / N+1 세 가지 케이스를 테스트하는 기법입니다.</div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">🔠 문자열 생성기</div>
+        <div class="help-text">기준 글자 수를 입력하면 경계값에 해당하는 문자열을 자동 생성합니다.</div>
+        <table class="help-table">
+          <thead><tr><th>항목</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td>문자 종류</td><td>한글 · 영문 대문자 · 영문 소문자 · 숫자 등 복수 선택 가능</td></tr>
+            <tr><td>기준 글자 수</td><td>최대 허용 글자 수 (1 이상 정수)</td></tr>
+            <tr><td>출력 모드</td><td>BVA 3세트 또는 단일 출력 선택</td></tr>
+          </tbody>
+        </table>
+        <div class="help-text" style="margin-top:10px; font-weight:600; color:var(--text); font-size:12px;">BVA 3세트 모드 생성 케이스:</div>
+        <table class="help-table">
+          <thead><tr><th>케이스</th><th>글자 수</th></tr></thead>
+          <tbody>
+            <tr><td><span class="help-badge under">미만</span></td><td>N − 1자</td></tr>
+            <tr><td><span class="help-badge exact">정확</span></td><td>N자 (경계값)</td></tr>
+            <tr><td><span class="help-badge over">초과</span></td><td>N + 1자</td></tr>
+          </tbody>
+        </table>
+        <div class="help-tip" style="margin-top:8px;">이모티콘·한글 같은 멀티바이트 문자는 <strong>글자 수 ≠ 바이트 수</strong>일 수 있습니다. 카드에서 두 값을 모두 확인하세요.</div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">🔐 비밀번호 생성기</div>
+        <div class="help-text">비밀번호 유효성 검사 테스트용 정상/비정상 케이스 세트를 생성합니다.</div>
+        <table class="help-table">
+          <thead><tr><th>케이스</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td><span class="help-badge ok">정상</span></td><td>모든 조건 충족</td></tr>
+            <tr><td><span class="help-badge fail">비정상</span></td><td>길이 부족 (N−1자)</td></tr>
+            <tr><td><span class="help-badge fail">비정상</span></td><td>대문자로만 구성</td></tr>
+            <tr><td><span class="help-badge fail">비정상</span></td><td>소문자로만 구성</td></tr>
+            <tr><td><span class="help-badge fail">비정상</span></td><td>특수기호 미포함</td></tr>
+          </tbody>
+        </table>
+        <div class="help-tip" style="margin-top:8px;"><strong>특수문자(!) 옵션</strong> 선택 시 비밀번호 맨 끝에 <code style="font-family:var(--mono);font-size:11px;">!</code>가 고정 포함됩니다.<br><strong>공백 포함</strong> 선택 시 중간 임의 위치에 공백 1개가 삽입됩니다.</div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">💡 단축키 &amp; 팁</div>
+        <div class="help-shortcut-row">
+          <span class="help-key">Enter</span>
+          <span>글자 수 입력 후 바로 생성</span>
+        </div>
+        <div class="help-shortcut-row">
+          <span class="help-key">− / +</span>
+          <span>글자 수 1씩 조절</span>
+        </div>
+        <div class="help-shortcut-row">
+          <span class="help-key">복사 버튼</span>
+          <span>결과 문자열을 클립보드에 복사</span>
+        </div>
+        <div class="help-shortcut-row">
+          <span class="help-key">패널 제목 클릭</span>
+          <span>패널 접기 / 펼치기</span>
+        </div>
+        <div class="help-shortcut-row">
+          <span class="help-key">결과 헤더 클릭</span>
+          <span>결과 목록 접기 / 펼치기</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<header class="header">
+  <button class="help-btn" id="helpToggleBtn" onclick="toggleHelp()" title="사용 설명서">?</button>
+  <span class="header-badge">BVA</span>
+  <span class="header-title">경계값 분석기</span>
+  <span class="header-sub">Boundary Value Analysis Tool v1.0</span>
+</header>
+
+<main class="main">
+  <div class="panel">
+    <div class="panel-header" id="strGenPanelHeader" onclick="togglePanel('strGen')">
+      <span class="panel-label" style="margin-bottom:0;">문자열 생성기</span>
+    </div>
+    <div class="panel-body" id="strGenBody">
+    <div class="controls-row">
+
+      <!-- Dropdown -->
+      <div class="dropdown-wrap" id="dropdownWrap">
+        <div class="dropdown-label">문자 종류</div>
+        <div class="dropdown-btn" id="dropdownBtn" onclick="toggleDropdown()">
+          <div class="dropdown-selected-tags" id="selectedTags">
+            <span class="tag none">선택하세요</span>
+          </div>
+          <svg class="dropdown-arrow" viewBox="0 0 16 16" fill="none">
+            <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="dropdown-menu" id="dropdownMenu">
+          <div class="menu-actions">
+            <button class="menu-action-btn" onclick="selectAll()">전체 선택</button>
+            <button class="menu-action-btn" onclick="clearAll()">전체 해제</button>
+          </div>
+          <div class="menu-divider"></div>
+          <label class="menu-item">
+            <input type="checkbox" value="띄어쓰기" data-preview="· · ·" onchange="onCheck()"> 띄어쓰기
+            <span class="menu-char-preview">· · ·</span>
+          </label>
+          <label class="menu-item">
+            <input type="checkbox" value="한글" data-preview="가나다" onchange="onCheck()"> 한글
+            <span class="menu-char-preview">가나다</span>
+          </label>
+          <label class="menu-item">
+            <input type="checkbox" value="영문대문자" data-preview="ABC" onchange="onCheck()"> 영문 대문자
+            <span class="menu-char-preview">ABC</span>
+          </label>
+          <label class="menu-item">
+            <input type="checkbox" value="영문소문자" data-preview="abc" onchange="onCheck()"> 영문 소문자
+            <span class="menu-char-preview">abc</span>
+          </label>
+          <label class="menu-item">
+            <input type="checkbox" value="중국어" data-preview="你好" onchange="onCheck()"> 중국어
+            <span class="menu-char-preview">你好</span>
+          </label>
+          <label class="menu-item">
+            <input type="checkbox" value="일본어" data-preview="あアカ" onchange="onCheck()"> 일본어
+            <span class="menu-char-preview">あアカ</span>
+          </label>
+          <label class="menu-item">
+            <input type="checkbox" value="숫자" data-preview="123" onchange="onCheck()"> 숫자
+            <span class="menu-char-preview">123</span>
+          </label>
+          <label class="menu-item">
+            <input type="checkbox" value="특수기호" data-preview="!@#" onchange="onCheck()"> 특수기호
+            <span class="menu-char-preview">!@#</span>
+          </label>
+          <label class="menu-item">
+            <input type="checkbox" value="이모티콘" data-preview="😀🎉" onchange="onCheck()"> 이모티콘
+            <span class="menu-char-preview">😀🎉</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Number Input -->
+      <div class="num-input-wrap">
+        <div class="num-input-label">기준 글자 수</div>
+        <div class="num-input-row">
+          <button class="num-spin" onclick="adjustNum(-1)">−</button>
+          <input class="num-field" type="number" id="numField" placeholder="10" min="1" max="9999" value="">
+          <button class="num-spin" onclick="adjustNum(1)">+</button>
+        </div>
+      </div>
+
+      <!-- Mode Toggle -->
+      <div class="mode-wrap">
+        <div class="num-input-label">출력 모드</div>
+        <div class="toggle-group">
+          <button class="toggle-btn active" id="modeBva" onclick="setMode('bva')">BVA 3세트</button>
+          <button class="toggle-btn" id="modeSingle" onclick="setMode('single')">단일 출력</button>
+        </div>
+      </div>
+
+      <!-- Generate Button -->
+      <button class="gen-btn" onclick="generate()">생성하기 →</button>
+
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <!-- 경계값 분석 결과 -->
+    <div class="output-area" id="outputArea" style="margin-top:16px;">
+      <div class="empty-state">
+        <div class="empty-icon">⌨</div>
+        문자 종류를 선택하고 글자 수를 입력한 뒤<br>
+        <strong style="color:var(--text-2)">생성하기</strong> 버튼을 누르세요
+      </div>
+    </div>
+    </div><!-- /panel-body -->
+  </div>
+  <div class="panel">
+    <div class="panel-label">비밀번호 생성기</div>
+
+    <!-- 옵션 영역 -->
+    <div class="pw-section-box">
+      <div class="controls-row" style="flex-wrap:wrap; gap:16px; align-items:flex-end;">
+
+        <!-- 포함 옵션 드롭다운 -->
+        <div style="flex:1; min-width:180px;">
+          <div class="num-input-label" style="margin-bottom:6px;">포함 옵션</div>
+          <div style="position:relative;" id="pwOptWrap">
+            <button id="pwOptBtn" onclick="togglePwOptDropdown()"
+              style="width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px;
+                     background:var(--surface); border:1px solid var(--border); border-radius:8px;
+                     padding:0 12px; height:42px; cursor:pointer; font-family:var(--sans); font-size:12px;
+                     color:var(--text-2); transition:border-color 0.15s;">
+              <span id="pwOptLabel">숫자, 영문 대문자, 영문 소문자, 특수문자</span>
+              <svg id="pwOptChevron" viewBox="0 0 16 16" fill="none" style="width:13px;height:13px;flex-shrink:0;transition:transform 0.2s;">
+                <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div id="pwOptMenu" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:100;
+                 background:var(--surface); border:1px solid var(--border); border-radius:10px;
+                 box-shadow:0 8px 24px rgba(0,0,0,0.12); overflow:hidden; min-width:180px;">
+              <div style="display:flex; border-bottom:1px solid var(--border);">
+                <button onclick="pwOptSelectAll()" style="flex:1; padding:8px; font-size:11px; font-weight:600; color:var(--accent);
+                  background:none; border:none; border-right:1px solid var(--border); cursor:pointer; font-family:var(--sans);">전체 선택</button>
+                <button onclick="pwOptClearAll()" style="flex:1; padding:8px; font-size:11px; font-weight:600; color:var(--text-3);
+                  background:none; border:none; cursor:pointer; font-family:var(--sans);">전체 해제</button>
+              </div>
+              <label class="menu-item">
+                <input type="checkbox" id="pwOptDigit" checked onchange="updatePwOptLabel()"> 숫자
+                <span class="menu-char-preview">123</span>
+              </label>
+              <label class="menu-item">
+                <input type="checkbox" id="pwOptUpper" checked onchange="updatePwOptLabel()"> 영문 대문자
+                <span class="menu-char-preview">ABC</span>
+              </label>
+              <label class="menu-item">
+                <input type="checkbox" id="pwOptLower" checked onchange="updatePwOptLabel()"> 영문 소문자
+                <span class="menu-char-preview">abc</span>
+              </label>
+              <label class="menu-item">
+                <input type="checkbox" id="pwOptSpecial" checked onchange="updatePwOptLabel()"> 특수문자 (끝에 !)
+                <span class="menu-char-preview">!</span>
+              </label>
+              <label class="menu-item">
+                <input type="checkbox" id="pwOptSpace" onchange="updatePwOptLabel()"> 공백 포함
+                <span class="menu-char-preview">· ·</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 기준 글자수 -->
+        <div class="num-input-wrap">
+          <div class="num-input-label">기준 글자 수</div>
+          <div class="num-input-row">
+            <button class="num-spin" onclick="adjustPwNum(-1)">−</button>
+            <input class="num-field" type="number" id="pwNumField" placeholder="8" min="1" max="9999" value="8">
+            <button class="num-spin" onclick="adjustPwNum(1)">+</button>
+          </div>
+        </div>
+
+        <!-- 생성 버튼 -->
+        <button class="pw-gen-btn" onclick="generatePasswords()" style="align-self:flex-end;">
+          <svg viewBox="0 0 16 16" fill="none">
+            <rect x="2" y="6" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M5 6V4.5a3 3 0 0 1 6 0V6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <circle cx="8" cy="10" r="1.2" fill="currentColor"/>
+          </svg>
+          비밀번호 생성 →
+        </button>
+      </div>
+    </div>
+
+    <!-- 결과 영역 -->
+    <div id="pwOutput" style="margin-top:16px; display:none;">
+      <div class="result-group">
+        <div class="result-group-header" id="pwResultHeader" onclick="togglePwResult()">
+          <span class="result-group-badge">PW</span>
+          <span class="result-group-title">비밀번호 생성 결과</span>
+          <span class="result-group-count" id="pwResultCount"></span>
+          <svg class="result-group-arrow" id="pwResultArrow" viewBox="0 0 16 16" fill="none">
+            <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="result-group-body" id="pwResultBody">
+          <div class="result-group-inner">
+            <div class="pw-cards" id="pwCards"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="footer-bar">
+  <div class="footer-stat">
+    <div class="footer-dot on"></div>
+    준비됨
+  </div>
+  <div class="footer-stat" id="footerInfo" style="margin-left:auto">—</div>
+</footer>
+
+<script>
+  // ── 패널 드롭다운 ────────────────────────────────────
+  function togglePanel(id) {
+    const body   = document.getElementById(id + 'Body');
+    const header = document.getElementById(id + 'PanelHeader');
+    const isCollapsed = body.classList.contains('collapsed');
+    body.classList.toggle('collapsed', !isCollapsed);
+    header.classList.toggle('collapsed', !isCollapsed);
+  }
+
+  // ── 문자 풀 ──────────────────────────────────────────
+  const CHAR_POOLS = {
+    '띄어쓰기': ' ',
+    '한글':   '가나다라마바사아자차카타파하것이을를에서의도와과으로까지',
+    '영문대문자': 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+    '영문소문자': 'abcdefghijklmnopqrstuvwxyz',
+    '중국어': '你好世界中文字符汉字测试数据边界分析质量保证软件测试',
+    '일본어': 'あいうえおかきくけこさしすせそたちつてとアイウエオカキクケコ',
+    '숫자':   '0123456789',
+    '특수기호':'!@#$%^&*()_+-=[]{}|;\':",.<>?/`~\\',
+    '이모티콘': ['😀','😂','🎉','🔥','✨','🚀','💡','🎯','📌','🔑','😎','🤔','👍','❤️','⭐','🌟','💻','🖥','📱','🔍']
+  };
+
+  let mode = 'bva';
+
+  // ── 드롭다운 ─────────────────────────────────────────
+  function toggleDropdown() {
+    const btn = document.getElementById('dropdownBtn');
+    const menu = document.getElementById('dropdownMenu');
+    const open = menu.classList.contains('open');
+    if (open) { closeDropdown(); }
+    else { btn.classList.add('open'); menu.classList.add('open'); }
+  }
+  function closeDropdown() {
+    document.getElementById('dropdownBtn').classList.remove('open');
+    document.getElementById('dropdownMenu').classList.remove('open');
+  }
+  document.addEventListener('click', e => {
+    if (!document.getElementById('dropdownWrap').contains(e.target)) closeDropdown();
+  });
+
+  function selectAll() {
+    document.querySelectorAll('.dropdown-menu input[type="checkbox"]').forEach(c => c.checked = true);
+    updateTags();
+  }
+  function clearAll() {
+    document.querySelectorAll('.dropdown-menu input[type="checkbox"]').forEach(c => c.checked = false);
+    updateTags();
+  }
+  function onCheck() { updateTags(); }
+
+  function updateTags() {
+    const checked = getChecked();
+    const container = document.getElementById('selectedTags');
+    if (checked.length === 0) {
+      container.innerHTML = '<span class="tag none">선택하세요</span>';
+    } else {
+      container.innerHTML = checked.map(v => `<span class="tag">${v}</span>`).join('');
+    }
+  }
+  function getChecked() {
+    return [...document.querySelectorAll('.dropdown-menu input[type="checkbox"]:checked')].map(c => c.value);
+  }
+
+  // ── 숫자 조작 ────────────────────────────────────────
+  function adjustNum(delta) {
+    const f = document.getElementById('numField');
+    const cur = parseInt(f.value) || 0;
+    const next = Math.max(1, cur + delta);
+    f.value = next;
+  }
+
+  // ── 모드 토글 ────────────────────────────────────────
+  function setMode(m) {
+    mode = m;
+    document.getElementById('modeBva').classList.toggle('active', m === 'bva');
+    document.getElementById('modeSingle').classList.toggle('active', m === 'single');
+  }
+
+  // ── 문자 생성 ────────────────────────────────────────
+  function buildPool(types) {
+    let regular = [];
+    let emojis = [];
+    for (const t of types) {
+      if (t === '이모티콘') emojis = [...emojis, ...CHAR_POOLS['이모티콘']];
+      else regular = [...regular, ...CHAR_POOLS[t].split('')];
+    }
+    return { regular, emojis };
+  }
+
+  // ── 카테고리 우선순위 ────────────────────────────────
+  function charCategory(c) {
+    const cp = c.codePointAt(0);
+    if (cp >= 0xAC00 && cp <= 0xD7A3) return 0; // 한글
+    if (cp >= 0x4E00 && cp <= 0x9FFF) return 1; // 중국어
+    if (cp >= 0x3040 && cp <= 0x30FF) return 2; // 일본어
+    if (cp >= 65  && cp <= 90)        return 3; // 영문 대문자 A-Z
+    if (cp >= 97  && cp <= 122)       return 4; // 영문 소문자 a-z
+    if (cp >= 48  && cp <= 57)        return 5; // 숫자 0-9
+    if (cp > 0xFFFF)                  return 7; // 이모티콘
+    return 6;                                    // 특수기호
+  }
+
+  function sortedOutput(chars) {
+    const spaces = chars.filter(c => c === ' ');
+    const rest   = chars.filter(c => c !== ' ');
+    rest.sort((a, b) => {
+      const ca = charCategory(a), cb = charCategory(b);
+      if (ca !== cb) return ca - cb;
+      // 같은 카테고리 안에서 코드포인트 오름차순 (locale 사용 안 함)
+      return a.codePointAt(0) - b.codePointAt(0);
+    });
+    return [...rest, ...spaces].join('');
+  }
+
+  function generateString(n, types) {
+    if (n <= 0) return '';
+
+    const hasSpace = types.includes('띄어쓰기');
+    const otherTypes = types.filter(t => t !== '띄어쓰기');
+
+    if (hasSpace && otherTypes.length === 0) return ' '.repeat(n);
+
+    // 각 카테고리별로 정렬된 풀을 따로 관리
+    const categoryPools = [];
+    const ORDER = ['한글','중국어','일본어','영문대문자','영문소문자','숫자','특수기호','이모티콘'];
+    for (const type of ORDER) {
+      if (!types.includes(type)) continue;
+      if (type === '이모티콘') {
+        categoryPools.push([...CHAR_POOLS['이모티콘']]);
+      } else {
+        const sorted = CHAR_POOLS[type].split('').sort((a,b) => a.codePointAt(0) - b.codePointAt(0));
+        categoryPools.push(sorted);
+      }
+    }
+    if (categoryPools.length === 0) return '';
+
+    // 총 fillCount개를 카테고리별로 균등 분배한 뒤, 각 카테고리 내 순서대로 순환
+    const fillCount = hasSpace ? n - 1 : n;
+    const result = [];
+
+    // 카테고리별 할당 개수 계산 (나머지는 앞 카테고리에 추가)
+    const base = Math.floor(fillCount / categoryPools.length);
+    const remainder = fillCount % categoryPools.length;
+    const allocs = categoryPools.map((_, i) => base + (i < remainder ? 1 : 0));
+
+    for (let ci = 0; ci < categoryPools.length; ci++) {
+      const pool = categoryPools[ci];
+      const count = allocs[ci];
+      for (let i = 0; i < count; i++) {
+        result.push(pool[i % pool.length]);
+      }
+    }
+
+    if (hasSpace) result.push(' ');
+
+    // 최종 정렬 (카테고리 순 → 카테고리 내 코드포인트 순)
+    return sortedOutput(result);
+  }
+
+  function byteLength(str) {
+    return new Blob([str]).size;
+  }
+
+  // ── 에러 표시 ────────────────────────────────────────
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 3000);
+  }
+
+  // ── 메인 생성 ────────────────────────────────────────
+  function generate() {
+    const types = getChecked();
+    const rawNum = parseInt(document.getElementById('numField').value) || 10;
+
+    if (types.length === 0) types.push('한글');
+    if (rawNum < 1) { showError('⚠ 유효한 글자 수를 입력해 주세요. (최소 1)'); return; }
+    if (rawNum > 9999) { showError('⚠ 글자 수는 9,999자 이하로 입력해 주세요.'); return; }
+
+    const hasEmoji = types.includes('이모티콘');
+
+    let cases;
+    if (mode === 'bva') {
+      cases = [
+        { label: 'N−1', badge: 'badge-under', desc: '경계값 미만', n: Math.max(1, rawNum - 1) },
+        { label: 'N',   badge: 'badge-exact', desc: '정확한 경계값', n: rawNum },
+        { label: 'N+1', badge: 'badge-over',  desc: '경계값 초과', n: rawNum + 1 },
+      ];
+    } else {
+      cases = [
+        { label: 'SINGLE', badge: 'badge-single', desc: `${rawNum}자 단일 출력`, n: rawNum },
+      ];
+    }
+
+    const cards = cases.map(c => {
+      const str = generateString(c.n, types);
+      const bytes = byteLength(str);
+      const showBytes = hasEmoji || types.some(t => ['한글','중국어','일본어'].includes(t));
+      return { ...c, str, bytes, showBytes };
+    });
+
+    renderCards(cards, types);
+
+    document.getElementById('footerInfo').textContent =
+      `선택: ${types.join(' · ')} | 기준: ${rawNum}자 | 모드: ${mode === 'bva' ? 'BVA 3세트' : '단일 출력'}`;
+  }
+
+  // ── 렌더링 ───────────────────────────────────────────
+  function renderCards(cards, types) {
+    const area = document.getElementById('outputArea');
+
+    if (mode === 'bva') {
+      // BVA 모드: 하나의 드롭다운 그룹으로 3개 카드를 묶음
+      area.innerHTML = `
+        <div class="result-group" id="resultGroup">
+          <div class="result-group-header" id="resultGroupHeader" onclick="toggleResultGroup()">
+            <span class="result-group-badge">BVA</span>
+            <span class="result-group-title">경계값 분석 결과</span>
+            <span class="result-group-count" id="resultGroupCount"></span>
+            <svg class="result-group-arrow" id="resultGroupArrow" viewBox="0 0 16 16" fill="none">
+              <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="result-group-body" id="resultGroupBody">
+            <div class="result-group-inner" id="cardGrid"></div>
+          </div>
+        </div>
+      `;
+    } else {
+      area.innerHTML = '<div class="output-cards" id="cardGrid"></div>';
+    }
+
+    const grid = document.getElementById('cardGrid');
+
+    cards.forEach((c, idx) => {
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.innerHTML = `
+        <div class="card-header">
+          <span class="card-badge ${c.badge}">${c.label}</span>
+          <span style="font-size:12px;color:var(--text-3)">${c.desc}</span>
+          <div class="card-meta">
+            ${c.showBytes ? `<span class="byte-count">${c.bytes.toLocaleString()} bytes</span>` : ''}
+            <span class="card-count"><span>${c.n.toLocaleString()}</span> 글자</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-text" id="cardText${idx}">${escHtml(c.str)}</div>
+          <button class="copy-btn" id="copyBtn${idx}">
+            <svg viewBox="0 0 16 16" fill="none">
+              <rect x="5" y="5" width="8" height="9" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M3 11V3.5A1.5 1.5 0 0 1 4.5 2H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+            복사
+          </button>
+        </div>
+      `;
+      grid.appendChild(div);
+      div.querySelector(`#copyBtn${idx}`).__str = c.str;
+      div.querySelector(`#copyBtn${idx}`).onclick = () => copyCard(idx, c.str);
+    });
+
+    // BVA 모드: 그룹 카운트 표시
+    if (mode === 'bva') {
+      const countEl = document.getElementById('resultGroupCount');
+      if (countEl) countEl.textContent = `${cards.length}개 세트`;
+    }
+  }
+
+  function toggleResultGroup() {
+    const header = document.getElementById('resultGroupHeader');
+    const body   = document.getElementById('resultGroupBody');
+    const arrow  = document.getElementById('resultGroupArrow');
+    const isCollapsed = body.classList.contains('collapsed');
+    body.classList.toggle('collapsed', !isCollapsed);
+    arrow.classList.toggle('collapsed', !isCollapsed);
+    header.classList.toggle('collapsed', !isCollapsed);
+  }
+
+  function escHtml(str) {
+    return str
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/ /g,'&nbsp;');
+  }
+  function escJs(str) { return ''; } // placeholder, using closure instead
+
+  async function copyCard(idx, str) {
+    try {
+      await navigator.clipboard.writeText(str);
+      const btn = document.getElementById(`copyBtn${idx}`);
+      btn.classList.add('copied');
+      btn.innerHTML = `
+        <svg viewBox="0 0 16 16" fill="none">
+          <path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        완료!
+      `;
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.innerHTML = `
+          <svg viewBox="0 0 16 16" fill="none">
+            <rect x="5" y="5" width="8" height="9" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M3 11V3.5A1.5 1.5 0 0 1 4.5 2H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          복사
+        `;
+      }, 1800);
+    } catch {
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = str;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+  }
+
+  // ── 비밀번호 생성 ─────────────────────────────────────
+  const PW_UPPER   = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const PW_LOWER   = 'abcdefghijklmnopqrstuvwxyz';
+  const PW_SPECIAL = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+  const PW_DIGIT   = '0123456789';
+
+  function randChar(pool) {
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function makePw(length, pools, addBang) {
+    // guarantee at least one char from each pool, fill rest randomly
+    const all = pools.join('');
+    let chars = pools.map(p => randChar(p));
+    while (chars.length < length) chars.push(randChar(all));
+    const base = shuffle(chars).join('');
+    return addBang ? base + '!' : base;
+  }
+
+  // ── 비밀번호 옵션 드롭다운 ──────────────────────────
+  function togglePwOptDropdown() {
+    const menu = document.getElementById('pwOptMenu');
+    const chevron = document.getElementById('pwOptChevron');
+    const isOpen = menu.style.display !== 'none';
+    menu.style.display = isOpen ? 'none' : 'block';
+    chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+  }
+  document.addEventListener('click', e => {
+    const wrap = document.getElementById('pwOptWrap');
+    if (wrap && !wrap.contains(e.target)) {
+      document.getElementById('pwOptMenu').style.display = 'none';
+      document.getElementById('pwOptChevron').style.transform = '';
+    }
+  });
+  function pwOptSelectAll() {
+    ['pwOptUpper','pwOptLower','pwOptDigit','pwOptSpecial','pwOptSpace'].forEach(id => document.getElementById(id).checked = true);
+    updatePwOptLabel();
+  }
+  function pwOptClearAll() {
+    ['pwOptUpper','pwOptLower','pwOptDigit','pwOptSpecial','pwOptSpace'].forEach(id => document.getElementById(id).checked = false);
+    updatePwOptLabel();
+  }
+  function updatePwOptLabel() {
+    const map = { pwOptDigit:'숫자', pwOptUpper:'영문 대문자', pwOptLower:'영문 소문자', pwOptSpecial:'특수문자', pwOptSpace:'공백' };
+    const selected = Object.entries(map).filter(([id]) => document.getElementById(id).checked).map(([,v]) => v);
+    document.getElementById('pwOptLabel').textContent = selected.length ? selected.join(', ') : '선택 없음';
+  }
+
+  function adjustPwNum(delta) {
+    const f = document.getElementById('pwNumField');
+    const cur = parseInt(f.value) || 8;
+    f.value = Math.max(1, cur + delta);
+  }
+
+  function generatePasswords() {
+    const baseN   = parseInt(document.getElementById('pwNumField').value) || 8;
+    const useUpper   = document.getElementById('pwOptUpper').checked;
+    const useLower   = document.getElementById('pwOptLower').checked;
+    const useDigit   = document.getElementById('pwOptDigit').checked;
+    const useSpecial = document.getElementById('pwOptSpecial').checked;
+    const useSpace   = document.getElementById('pwOptSpace').checked;
+
+    // 정상 비밀번호용 풀 구성
+    const validPools = [];
+    if (useUpper)   validPools.push(PW_UPPER);
+    if (useLower)   validPools.push(PW_LOWER);
+    if (useDigit)   validPools.push(PW_DIGIT);
+    if (validPools.length === 0) validPools.push(PW_UPPER, PW_LOWER); // fallback
+
+    // 비밀번호 정렬: 대문자(A→Z) → 소문자(a→z) → 숫자(0→9) → 특수기호 → 공백 → ! 고정 맨 끝
+    function sortPw(chars) {
+      const cat = c => {
+        const cp = c.codePointAt(0);
+        if (cp >= 65 && cp <= 90)  return 0; // A-Z
+        if (cp >= 97 && cp <= 122) return 1; // a-z
+        if (cp >= 48 && cp <= 57)  return 2; // 0-9
+        if (c === ' ')             return 4;
+        return 3;                             // 특수기호
+      };
+      return [...chars].sort((a, b) => {
+        const ca = cat(a), cb = cat(b);
+        if (ca !== cb) return ca - cb;
+        return a.codePointAt(0) - b.codePointAt(0);
+      }).join('');
+    }
+
+    function buildPw(length, pools, bang, space) {
+      // 각 풀을 오름차순 정렬 후 순서대로 순환 배치
+      const sortedPools = pools.map(p => p.split('').sort((a,b) => a.codePointAt(0) - b.codePointAt(0)));
+      const bodyLen = bang ? length - 1 : length;
+      const spaceSlot = space ? 1 : 0;
+      const fillLen = bodyLen - spaceSlot;
+
+      const chars = [];
+      // 풀별 균등 분배 후 순서대로
+      const base = Math.floor(fillLen / sortedPools.length);
+      const rem  = fillLen % sortedPools.length;
+      for (let pi = 0; pi < sortedPools.length; pi++) {
+        const pool  = sortedPools[pi];
+        const count = base + (pi < rem ? 1 : 0);
+        for (let i = 0; i < count; i++) {
+          chars.push(pool[i % pool.length]);
+        }
+      }
+
+      // 정렬 후 ! / 공백 맨 끝 고정
+      let str = sortPw(chars);
+      if (bang)  str = str + '!';
+      if (space) str = str + ' ';
+      return str;
+    }
+
+    // ── 정상 케이스 타이틀 동적 구성 ──
+    const normalParts = [];
+    if (useUpper) normalParts.push('영문 대문자');
+    if (useLower) normalParts.push('영문 소문자');
+    if (useDigit) normalParts.push('숫자');
+    if (useSpecial) normalParts.push('특수기호(!)');
+    if (useSpace) normalParts.push('공백');
+    const validTitle = `${baseN}자리, ${normalParts.join(' + ')} 포함`;
+
+    // ── 비정상 케이스: 선택된 옵션 기준으로 "하나씩 빠진" 케이스 생성 ──
+    const cases = [
+      // 정상
+      {
+        badge: 'pw-badge-ok',
+        badgeText: '정상',
+        title: validTitle,
+        reason: '모든 조건 충족',
+        gen: () => {
+          // 선택된 풀별 고정 비율 배분 (8자 기준: 대문자3 + 소문자3 + 숫자2 + !)
+          // 특수기호(!) 자리, 공백 자리를 먼저 빼고 남은 자리를 풀들에 분배
+          const specialSlot = useSpecial ? 1 : 0;
+          const spaceSlot   = useSpace   ? 1 : 0;
+          const fillLen = baseN - specialSlot - spaceSlot;
+
+          // 활성 풀 목록 (순서: 대문자 → 소문자 → 숫자)
+          const activePools = [];
+          if (useUpper) activePools.push(PW_UPPER);
+          if (useLower) activePools.push(PW_LOWER);
+          if (useDigit) activePools.push(PW_DIGIT);
+          if (activePools.length === 0) activePools.push(PW_UPPER, PW_LOWER);
+
+          // 각 풀에 배분할 개수: 숫자는 나머지의 1/4 (최소 1), 나머지는 균등
+          const digitCount  = useDigit ? Math.max(1, Math.round(fillLen / 3.5)) : 0;
+          const nonDigitLen = fillLen - digitCount;
+          const nonDigitPools = activePools.filter(p => p !== PW_DIGIT);
+          const baseCount = nonDigitPools.length > 0 ? Math.floor(nonDigitLen / nonDigitPools.length) : 0;
+          const remCount  = nonDigitPools.length > 0 ? nonDigitLen % nonDigitPools.length : 0;
+
+          const chars = [];
+          // 대문자 / 소문자 배분
+          for (let pi = 0; pi < nonDigitPools.length; pi++) {
+            const sorted = nonDigitPools[pi].split('').sort((a,b) => a.codePointAt(0) - b.codePointAt(0));
+            const count  = baseCount + (pi < remCount ? 1 : 0);
+            for (let j = 0; j < count; j++) chars.push(sorted[j % sorted.length]);
+          }
+          // 숫자 배분
+          if (useDigit) {
+            const dSorted = PW_DIGIT.split('').sort((a,b) => a.codePointAt(0) - b.codePointAt(0));
+            for (let j = 0; j < digitCount; j++) chars.push(dSorted[j % dSorted.length]);
+          }
+
+          let str = sortPw(chars);
+          if (useSpecial) str = str + '!';
+          if (useSpace)   str = str + ' ';
+          return str;
+        }
+      },
+      // 길이 부족 (나머지 조건은 정상과 동일, 특수기호 항상 포함)
+      {
+        badge: 'pw-badge-fail',
+        badgeText: '비정상',
+        title: `${baseN - 1}자리 (길이 부족)`,
+        reason: `${baseN - 1}자 < 최소 ${baseN}자`,
+        gen: () => {
+          // 공백 포함 케이스: (baseN-3)자 본문 + ! + 공백 = baseN-1자
+          if (useSpace && baseN - 1 > 2) {
+            const bodyLen = baseN - 3; // ! 1자 + 공백 1자 예약
+            const all = validPools.join('');
+            let chars = validPools.map(p => randChar(p));
+            while (chars.length < Math.max(bodyLen, validPools.length)) chars.push(randChar(all));
+            chars = chars.slice(0, Math.max(bodyLen, 1));
+            chars.sort((a,b)=>{
+              const cat=c=>(c>='A'&&c<='Z'?0:c>='a'&&c<='z'?1:c===' '?3:2);
+              return cat(a)-cat(b)||a.localeCompare(b);
+            });
+            let str = chars.join('') + '!'; // 특수기호 고정 포함
+            return str + ' '; // 공백 맨 끝
+          }
+          // 공백 없음: 특수기호 항상 true
+          return buildPw(baseN - 1, validPools, true, false);
+        }
+      },
+      // 대문자로만 구성 (소문자·특수기호·공백 없음)
+      {
+        badge: 'pw-badge-fail',
+        badgeText: '비정상',
+        title: `${baseN}자리, 영문 대문자로만 구성`,
+        reason: '소문자·특수기호 없음',
+        gen: () => { const pool='ABCDEFGHIJKLMNOPQRSTUVWXYZ'; return Array.from({length:baseN},(_,i)=>pool[i%pool.length]).join(''); }
+      },
+      // 소문자로만 구성 (대문자·특수기호·공백 없음)
+      {
+        badge: 'pw-badge-fail',
+        badgeText: '비정상',
+        title: `${baseN}자리, 영문 소문자로만 구성`,
+        reason: '대문자·특수기호 없음',
+        gen: () => { const pool='abcdefghijklmnopqrstuvwxyz'; return Array.from({length:baseN},(_,i)=>pool[i%pool.length]).join(''); }
+      },
+      // 특수기호 없음 (나머지 조건은 정상과 동일)
+      {
+        badge: 'pw-badge-fail',
+        badgeText: '비정상',
+        title: `${baseN}자리, 특수기호 없음`,
+        reason: '특수기호 미포함',
+        gen: () => buildPw(baseN, validPools.length > 0 ? validPools : [PW_UPPER, PW_LOWER], false, useSpace)
+      },
+      // 숫자로만 구성
+      {
+        badge: 'pw-badge-fail',
+        badgeText: '비정상',
+        title: `${baseN}자리, 숫자로만 구성`,
+        reason: '영문·특수기호 없음',
+        gen: () => { const pool='0123456789'; return Array.from({length:baseN},(_,i)=>pool[i%pool.length]).join(''); }
+      },
+    ];
+
+    const grid = document.getElementById('pwCards');
+    grid.innerHTML = '';
+
+    cases.forEach((c, idx) => {
+      const pw = c.gen();
+      const div = document.createElement('div');
+      div.className = 'pw-card';
+      div.innerHTML = `
+        <div class="pw-card-header">
+          <span class="pw-badge ${c.badge}">${c.badgeText}</span>
+          <span class="pw-card-title">${c.title}</span>
+          <span class="pw-card-reason">${c.reason}</span>
+        </div>
+        <div class="pw-card-body">
+          <div class="pw-value" id="pwVal${idx}">${escHtml(pw)}</div>
+          <button class="copy-btn" id="pwCopyBtn${idx}">
+            <svg viewBox="0 0 16 16" fill="none">
+              <rect x="5" y="5" width="8" height="9" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M3 11V3.5A1.5 1.5 0 0 1 4.5 2H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+            복사
+          </button>
+        </div>
+      `;
+      const btn = div.querySelector(`#pwCopyBtn${idx}`);
+      btn.onclick = () => copyPw(idx, pw);
+      grid.appendChild(div);
+    });
+
+    document.getElementById('pwOutput').style.display = 'block';
+    // 카운트 표시 & 펼침 상태 초기화
+    document.getElementById('pwResultCount').textContent = `${cases.length}개`;
+    const body = document.getElementById('pwResultBody');
+    const header = document.getElementById('pwResultHeader');
+    const arrow = document.getElementById('pwResultArrow');
+    body.classList.remove('collapsed');
+    header.classList.remove('collapsed');
+    arrow.classList.remove('collapsed');
+  }
+
+  function togglePwResult() {
+    const body   = document.getElementById('pwResultBody');
+    const header = document.getElementById('pwResultHeader');
+    const arrow  = document.getElementById('pwResultArrow');
+    const isCollapsed = body.classList.contains('collapsed');
+    body.classList.toggle('collapsed', !isCollapsed);
+    header.classList.toggle('collapsed', !isCollapsed);
+    arrow.classList.toggle('collapsed', !isCollapsed);
+  }
+
+  async function copyPw(idx, str) {
+    try {
+      await navigator.clipboard.writeText(str);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = str; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    const btn = document.getElementById(`pwCopyBtn${idx}`);
+    btn.classList.add('copied');
+    btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>완료!`;
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="8" height="9" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M3 11V3.5A1.5 1.5 0 0 1 4.5 2H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>복사`;
+    }, 1800);
+  }
+
+  // ── Enter 키 지원 ───────────────────────────────────
+  document.getElementById('numField').addEventListener('keydown', e => {
+    if (e.key === 'Enter') generate();
+  });
+
+  // ── 도움말 드로어 ────────────────────────────────────
+  function toggleHelp() {
+    const overlay = document.getElementById('helpOverlay');
+    const btn = document.getElementById('helpToggleBtn');
+    const isOpen = overlay.classList.contains('open');
+    overlay.classList.toggle('open', !isOpen);
+    btn.classList.toggle('active', !isOpen);
+  }
+  function closeHelp(e) {
+    // 드로어 바깥 클릭 시 닫기
+    if (!document.getElementById('helpDrawer').contains(e.target)) {
+      document.getElementById('helpOverlay').classList.remove('open');
+      document.getElementById('helpToggleBtn').classList.remove('active');
+    }
+  }
+</script>
+</body>
+</html>
